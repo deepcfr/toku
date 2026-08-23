@@ -1,0 +1,15 @@
+{
+  "singleQuote": false,
+  "trailingComma": "es5",
+  "tabWidth": 2,
+  "semi": true,
+  "printWidth": 80,
+  "arrowParens": "avoid",
+  "bracketSpacing": true,
+  "plugins": [
+    "prettier-plugin-tailwindcss",
+    "@ianvs/prettier-plugin-sort-imports",
+    "prettier-plugin-packagejson"
+  ],
+  "importOrder": ["^bun$", "<THIRD_PARTY_MODULES>", "^@toku/(.*)$", "^[./]"]
+}

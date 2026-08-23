@@ -1,0 +1,15 @@
+node_modules
+.turbo
+.next
+dist
+build
+coverage
+
+# lockfiles
+bun.lock
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# generated artifacts
+*.tsbuildinfo
