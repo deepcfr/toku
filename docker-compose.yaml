@@ -1,0 +1,57 @@
+name: toku
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: toku_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: deep
+      POSTGRES_PASSWORD: thicklatina
+      POSTGRES_DB: toku_db
+    volumes:
+      - toku_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U toku -d toku_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: toku_redis
+    restart: unless-stopped
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--appendfsync",
+        "everysec",
+        "--save",
+        "900",
+        "1",
+        "--save",
+        "300",
+        "10",
+        "--save",
+        "60",
+        "10000",
+      ]
+    volumes:
+      - toku_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    ports:
+      - "6379:6379"
+
+volumes:
+  toku_postgres_data:
+  toku_redis_data:
