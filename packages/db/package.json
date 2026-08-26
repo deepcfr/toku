@@ -1,0 +1,19 @@
+{
+  "name": "@toku/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "module": "index.ts",
+  "scripts": {
+    "db:migrate": "bun run src/migrate.ts"
+  },
+  "dependencies": {
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

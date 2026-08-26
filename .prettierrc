@@ -9,7 +9,10 @@
   "plugins": [
     "prettier-plugin-tailwindcss",
     "@ianvs/prettier-plugin-sort-imports",
-    "prettier-plugin-packagejson"
+    "prettier-plugin-packagejson",
+    "prettier-plugin-sql"
   ],
-  "importOrder": ["^bun$", "<THIRD_PARTY_MODULES>", "^@toku/(.*)$", "^[./]"]
+  "importOrder": ["^bun$", "<THIRD_PARTY_MODULES>", "^@toku/(.*)$", "^[./]"],
+  "language": "postgresql",
+  "keywordCase": "upper"
 }
