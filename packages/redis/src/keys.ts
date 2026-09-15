@@ -1,3 +1,5 @@
+import type { RateLimitAction } from "./rate-limit";
+
 export const RedisKeys = {
   room: (roomToken: string) => `toku:room:${roomToken}`,
   roomMembers: (roomToken: string) => `toku:room:${roomToken}:members`,
@@ -7,6 +9,7 @@ export const RedisKeys = {
   presence: (roomToken: string, pubKeyHash: string) =>
     `toku:presence:${roomToken}:${pubKeyHash}`,
   offlineQueue: (recipientHash: string) => `toku:offline:${recipientHash}`,
-  rateLimit: (action: string, target: string) => `toku:rl:${action}:${target}`,
+  rateLimit: (action: RateLimitAction, target: string) =>
+    `toku:rl:${action}:${target}`,
   ban: (identityHash: string) => `toku:ban:${identityHash}`,
-};
+} as const;
