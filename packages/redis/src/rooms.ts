@@ -10,12 +10,12 @@ export interface CreateRoomInput {
   passwordHash?: string;
 }
 
-export interface RoomMemberIdentifier {
+export interface RoomMemberKey {
   roomToken: string;
   pubKeyHash: string;
 }
 
-export interface AddRoomMemberInput extends RoomMemberIdentifier {
+export interface AddRoomMemberInput extends RoomMemberKey {
   publicKeyBytes: string;
 }
 
@@ -105,7 +105,7 @@ export function createRoomStore(redis: RedisClientType) {
   }
 
   // remove member atomically
-  async function removeMember({ roomToken, pubKeyHash }: RoomMemberIdentifier) {
+  async function removeMember({ roomToken, pubKeyHash }: RoomMemberKey) {
     const { roomKey, membersKey, keyringKey } = getKeys(roomToken);
 
     await redis
@@ -124,7 +124,7 @@ export function createRoomStore(redis: RedisClientType) {
   async function isMember({
     roomToken,
     pubKeyHash,
-  }: RoomMemberIdentifier): Promise<boolean> {
+  }: RoomMemberKey): Promise<boolean> {
     const { membersKey } = getKeys(roomToken);
     return (await redis.sIsMember(membersKey, pubKeyHash)) === 1;
   }
