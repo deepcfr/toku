@@ -63,6 +63,12 @@ if (import.meta.main) {
     console.error("[migrate] DATABASE_URL is required");
     process.exit(1);
   }
+  try {
+    new URL(url);
+  } catch {
+    console.error("[migrate] DATABASE_URL must be a valid URL");
+    process.exit(1);
+  }
   await runMigrations(url);
   process.exit(0);
 }

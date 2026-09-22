@@ -1,0 +1,23 @@
+{
+  "name": "@toku/env",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts",
+    "./worker": "./src/worker.ts",
+    "./web": "./src/web.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@t3-oss/env-core": "^0.13.11",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}
