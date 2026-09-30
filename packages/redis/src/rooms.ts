@@ -7,7 +7,7 @@ const ROOM_TTL_SECONDS = 86400;
 // all types
 export interface CreateRoomInput {
   roomToken: string;
-  passwordHash?: string;
+  passwordHash: string;
 }
 
 export interface RoomMemberKey {
@@ -52,7 +52,7 @@ export function createRoomStore(redis: RedisClientType) {
     const hash: RoomHashFields = {
       created_at: String(now),
       member_count: "0",
-      password_hash: passwordHash ?? "",
+      password_hash: passwordHash,
       last_activity: String(now),
     };
 
