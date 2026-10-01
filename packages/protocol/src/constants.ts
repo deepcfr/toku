@@ -15,6 +15,7 @@ export const SIZES = {
   MEMBER_CNT: 1,
   CT_LEN: 2,
   ERROR_CODE: 1,
+  BURN: 1,
 } as const;
 
 // minimum valid frame size, magic byte + message type
