@@ -2,7 +2,9 @@
 // output stays Uint8Array so web (browser) can import this package, no Buffer
 
 import { PROTOCOL_MAGIC_BYTE, SIZES } from "./constants";
+import { ProtocolError } from "./errors";
 import {
+  ErrorCode,
   MessageType,
   type AnyMessage,
   type ChatMessage,
@@ -44,7 +46,8 @@ export function encode(msg: AnyMessage): Uint8Array {
     default:
       // msg is never here, all 8 opcodes handled above
       // cast only to report runtime-forged values tsc cannot see
-      throw new Error(
+      throw new ProtocolError(
+        ErrorCode.INVALID_FRAME,
         `unsupported message type: ${(msg as unknown as { type: unknown }).type}`
       );
   }
@@ -137,7 +140,8 @@ function encodePing(m: PresencePingMessage): Uint8Array {
 
 function encodeChat(m: ChatMessage): Uint8Array {
   // reachable boundary, media ciphertexts exceed the 2-byte length prefix
-  if (m.cipherText.length > 0xffff) throw new Error("ciphertext too large");
+  if (m.cipherText.length > 0xffff)
+    throw new ProtocolError(ErrorCode.INVALID_FRAME, "ciphertext too large");
   const encoder = new TextEncoder();
   const room = encoder.encode(m.roomToken);
   const from = encoder.encode(m.from);
@@ -287,7 +291,8 @@ function encodeRoomState(m: RoomStateMessage): Uint8Array {
   o += room.length;
 
   // 1-byte safety limit. upto 255 members are allowed
-  if (m.members.length > 0xff) throw new Error("too many members");
+  if (m.members.length > 0xff)
+    throw new ProtocolError(ErrorCode.INVALID_FRAME, "too many members");
   out[o++] = m.members.length;
   for (const key of m.members) {
     out.set(key, o);
