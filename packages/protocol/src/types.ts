@@ -12,6 +12,12 @@ export const MessageType = {
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
 
+export interface DecoderContext {
+  bytes: Uint8Array;
+  view: DataView;
+  o: number; // offset
+}
+
 export interface BaseMessage {
   type: MessageType;
   roomToken: string;

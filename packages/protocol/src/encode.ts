@@ -17,6 +17,8 @@ import {
   type RoomStateMessage,
 } from "./types";
 
+const utf8 = new TextEncoder();
+
 export function encode(msg: AnyMessage): Uint8Array {
   switch (msg.type) {
     case MessageType.JOIN_ROOM:
@@ -56,7 +58,7 @@ export function encode(msg: AnyMessage): Uint8Array {
 // encode all the different types of messages
 function encodeJoin(m: JoinRoomMessage): Uint8Array {
   // string -> raw bytes
-  const room = new TextEncoder().encode(m.roomToken);
+  const room = utf8.encode(m.roomToken);
 
   // | 1 | 1 | 1 | N | 32 | 32 |
   // if ROOM_LEN = 10, the next 10 bytes will be used for the room
@@ -93,7 +95,7 @@ function encodeJoin(m: JoinRoomMessage): Uint8Array {
 }
 
 function encodeLeave(m: LeaveRoomMessage): Uint8Array {
-  const room = new TextEncoder().encode(m.roomToken);
+  const room = utf8.encode(m.roomToken);
   const totalSize = SIZES.MAGIC + SIZES.TYPE + SIZES.ROOM_LEN + room.length;
 
   const out = new Uint8Array(totalSize);
@@ -109,9 +111,8 @@ function encodeLeave(m: LeaveRoomMessage): Uint8Array {
 }
 
 function encodePing(m: PresencePingMessage): Uint8Array {
-  const encoder = new TextEncoder();
-  const room = encoder.encode(m.roomToken);
-  const from = encoder.encode(m.from);
+  const room = utf8.encode(m.roomToken);
+  const from = utf8.encode(m.from);
 
   const totalSize =
     SIZES.MAGIC +
@@ -142,9 +143,8 @@ function encodeChat(m: ChatMessage): Uint8Array {
   // reachable boundary, media ciphertexts exceed the 2-byte length prefix
   if (m.cipherText.length > 0xffff)
     throw new ProtocolError(ErrorCode.INVALID_FRAME, "ciphertext too large");
-  const encoder = new TextEncoder();
-  const room = encoder.encode(m.roomToken);
-  const from = encoder.encode(m.from);
+  const room = utf8.encode(m.roomToken);
+  const from = utf8.encode(m.from);
 
   const totalSize =
     SIZES.MAGIC +
@@ -200,9 +200,8 @@ function encodeChat(m: ChatMessage): Uint8Array {
 }
 
 function encodeKeyExchange(m: KeyExchangeMessage): Uint8Array {
-  const encoder = new TextEncoder();
-  const room = encoder.encode(m.roomToken);
-  const from = encoder.encode(m.from);
+  const room = utf8.encode(m.roomToken);
+  const from = utf8.encode(m.from);
 
   const totalSize =
     SIZES.MAGIC +
@@ -234,9 +233,8 @@ function encodeKeyExchange(m: KeyExchangeMessage): Uint8Array {
 }
 
 function encodeAck(m: DeliveryAckMessage): Uint8Array {
-  const encoder = new TextEncoder();
-  const room = encoder.encode(m.roomToken);
-  const from = encoder.encode(m.from);
+  const room = utf8.encode(m.roomToken);
+  const from = utf8.encode(m.from);
 
   const totalSize =
     SIZES.MAGIC +
@@ -269,8 +267,7 @@ function encodeAck(m: DeliveryAckMessage): Uint8Array {
 }
 
 function encodeRoomState(m: RoomStateMessage): Uint8Array {
-  const encoder = new TextEncoder();
-  const room = encoder.encode(m.roomToken);
+  const room = utf8.encode(m.roomToken);
   const totalSize =
     SIZES.MAGIC +
     SIZES.TYPE +
