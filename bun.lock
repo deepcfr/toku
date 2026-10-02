@@ -57,6 +57,13 @@
         "typescript-eslint": "^8.50.0",
       },
     },
+    "packages/protocol": {
+      "name": "@toku/protocol",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
+    },
     "packages/redis": {
       "name": "@toku/redis",
       "version": "0.0.0",
@@ -159,6 +166,8 @@
     "@toku/env": ["@toku/env@workspace:packages/env"],
 
     "@toku/eslint-config": ["@toku/eslint-config@workspace:packages/eslint-config"],
+
+    "@toku/protocol": ["@toku/protocol@workspace:packages/protocol"],
 
     "@toku/redis": ["@toku/redis@workspace:packages/redis"],
 
