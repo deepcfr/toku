@@ -1,13 +1,11 @@
 import type { RedisClientType } from "redis";
 import { RedisKeys } from "./keys";
 
-// default room TTL = 24 hours
-const ROOM_TTL_SECONDS = 86400;
-
 // all types
 export interface CreateRoomInput {
   roomToken: string;
   passwordHash: string;
+  durationSeconds: number; // dynamic room TTL
 }
 
 export interface RoomMemberKey {
@@ -23,7 +21,7 @@ export interface RoomMetadata {
   createdAt: number;
   memberCount: number;
   passwordHash: string;
-  lastActivity: number;
+  lifetimeSeconds: number;
 }
 
 // Redis hash fields use snake_case by convention, it gives autocomplete for hSet/hGetAll
@@ -31,7 +29,7 @@ export type RoomHashFields = Record<string, string> & {
   created_at: string;
   member_count: string;
   password_hash: string;
-  last_activity: string;
+  lifetime_seconds: string;
 };
 
 // create room store
@@ -44,8 +42,12 @@ export function createRoomStore(redis: RedisClientType) {
     };
   }
 
-  // initialize room metadata and set 24h ttl
-  async function createRoom({ roomToken, passwordHash }: CreateRoomInput) {
+  // initialize room metadata with caller-provided lifetime
+  async function createRoom({
+    roomToken,
+    passwordHash,
+    durationSeconds,
+  }: CreateRoomInput) {
     const { roomKey, membersKey, keyringKey } = getKeys(roomToken);
     const now = Date.now();
 
@@ -53,7 +55,7 @@ export function createRoomStore(redis: RedisClientType) {
       created_at: String(now),
       member_count: "0",
       password_hash: passwordHash,
-      last_activity: String(now),
+      lifetime_seconds: String(durationSeconds),
     };
 
     // use MULTI/EXEC for handling race condition
@@ -61,9 +63,9 @@ export function createRoomStore(redis: RedisClientType) {
     await redis
       .multi()
       .hSet(roomKey, hash)
-      .expire(roomKey, ROOM_TTL_SECONDS)
-      .expire(membersKey, ROOM_TTL_SECONDS)
-      .expire(keyringKey, ROOM_TTL_SECONDS)
+      .expire(roomKey, durationSeconds)
+      .expire(membersKey, durationSeconds)
+      .expire(keyringKey, durationSeconds)
       .exec();
   }
 
@@ -78,7 +80,7 @@ export function createRoomStore(redis: RedisClientType) {
       createdAt: Number(data.created_at ?? 0),
       memberCount: Number(data.member_count ?? 0),
       passwordHash: data.password_hash ?? "",
-      lastActivity: Number(data.last_activity ?? 0),
+      lifetimeSeconds: Number(data.lifetime_seconds ?? 86400),
     };
   }
 
@@ -89,7 +91,12 @@ export function createRoomStore(redis: RedisClientType) {
     publicKeyBytes,
   }: AddRoomMemberInput) {
     const { roomKey, membersKey, keyringKey } = getKeys(roomToken);
-    const now = Date.now();
+
+    // check the exact remaining seconds left on the core room bucket
+    const remainingTtl = await redis.ttl(roomKey);
+
+    // doesnt have an expiry or already dead
+    if (remainingTtl <= 0) return;
 
     // atomically joins a member
     await redis
@@ -97,10 +104,9 @@ export function createRoomStore(redis: RedisClientType) {
       .sAdd(membersKey, pubKeyHash)
       .hIncrBy(roomKey, "member_count", 1)
       .hSet(keyringKey, pubKeyHash, publicKeyBytes)
-      .hSet(roomKey, "last_activity", String(now))
-      .expire(roomKey, ROOM_TTL_SECONDS)
-      .expire(membersKey, ROOM_TTL_SECONDS)
-      .expire(keyringKey, ROOM_TTL_SECONDS)
+      .expire(roomKey, remainingTtl)
+      .expire(membersKey, remainingTtl)
+      .expire(keyringKey, remainingTtl)
       .exec();
   }
 
@@ -108,15 +114,17 @@ export function createRoomStore(redis: RedisClientType) {
   async function removeMember({ roomToken, pubKeyHash }: RoomMemberKey) {
     const { roomKey, membersKey, keyringKey } = getKeys(roomToken);
 
+    const remainingTtl = await redis.ttl(roomKey);
+    if (remainingTtl <= 0) return;
+
     await redis
       .multi()
       .sRem(membersKey, pubKeyHash)
       .hIncrBy(roomKey, "member_count", -1)
       .hDel(keyringKey, pubKeyHash)
-      .hSet(roomKey, "last_activity", String(Date.now()))
-      .expire(roomKey, ROOM_TTL_SECONDS)
-      .expire(membersKey, ROOM_TTL_SECONDS)
-      .expire(keyringKey, ROOM_TTL_SECONDS)
+      .expire(roomKey, remainingTtl)
+      .expire(membersKey, remainingTtl)
+      .expire(keyringKey, remainingTtl)
       .exec();
   }
 
@@ -137,20 +145,6 @@ export function createRoomStore(redis: RedisClientType) {
     return await redis.hGetAll(keyringKey);
   }
 
-  // refreshes room TTL on message activity
-  async function touch(roomToken: string): Promise<void> {
-    const { roomKey, membersKey, keyringKey } = getKeys(roomToken);
-    const now = Date.now();
-
-    await redis
-      .multi()
-      .hSet(roomKey, "last_activity", String(now))
-      .expire(roomKey, ROOM_TTL_SECONDS)
-      .expire(membersKey, ROOM_TTL_SECONDS)
-      .expire(keyringKey, ROOM_TTL_SECONDS)
-      .exec();
-  }
-
   return {
     createRoom,
     getRoom,
@@ -158,6 +152,5 @@ export function createRoomStore(redis: RedisClientType) {
     removeMember,
     isMember,
     getAllPublicKeys,
-    touch,
   };
 }
