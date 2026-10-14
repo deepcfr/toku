@@ -3,7 +3,7 @@
 const MAX_BYTES = 65536;
 
 // generate safe, raw binary numbers -> salts, nonces..
-export function randomBytes(n: number): Uint8Array {
+export function randomBytes(n: number): Uint8Array<ArrayBuffer> {
   if (!Number.isInteger(n) || n < 0) {
     throw new RangeError("byte length must be a non-negative integer");
   }

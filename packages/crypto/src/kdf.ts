@@ -15,7 +15,7 @@ export interface HkdfInput {
 // hashes arbitrary bytes using SHA-256
 export async function sha256(
   data: Uint8Array<ArrayBuffer>
-): Promise<Uint8Array> {
+): Promise<Uint8Array<ArrayBuffer>> {
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
   return new Uint8Array(hashBuffer);
 }
@@ -24,7 +24,7 @@ export async function sha256(
 export async function pbkdf2({
   password,
   salt,
-}: Pbkdf2Input): Promise<Uint8Array> {
+}: Pbkdf2Input): Promise<Uint8Array<ArrayBuffer>> {
   if (password.length === 0) throw new RangeError("password cant be empty");
 
   // raw bytes must be imported before derivation
@@ -56,7 +56,7 @@ export async function hkdf({
   salt,
   info,
   byteLength,
-}: HkdfInput): Promise<Uint8Array> {
+}: HkdfInput): Promise<Uint8Array<ArrayBuffer>> {
   // raw bytes must be imported before derivation
   const keyMaterial = await crypto.subtle.importKey("raw", ikm, "HKDF", false, [
     "deriveBits",
