@@ -1,0 +1,21 @@
+{
+  "name": "@toku/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "dev": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "@toku/crypto": "workspace:*",
+    "@toku/env": "workspace:*",
+    "@toku/protocol": "workspace:*",
+    "@toku/redis": "workspace:*",
+    "eden": "^0.2.0",
+    "elysia": "1.4.30"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}
