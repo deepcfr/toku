@@ -9,16 +9,20 @@
     "build": "turbo run build",
     "check-types": "turbo run check-types",
     "clean": "turbo clean && rm -rf node_modules .turbo",
-    "db:migrate": "bun run --env-file .env.local --filter @toku/db db:migrate",
+    "db:migrate": "bun run --env-file .env --filter @toku/db db:migrate",
     "dev": "turbo run dev",
-    "format": "prettier --write \"**/*.{ts,tsx,js,json,md,yml,yaml}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,yml,yaml}\"",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,yml,yaml}\"",
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint -- --fix",
     "prepare": "husky",
     "test": "turbo run test"
   },
   "lint-staged": {
+    "apps/api/**/*.ts": [
+      "bun run --filter @toku/api lint -- --fix",
+      "bunx prettier --write"
+    ],
     "apps/server/**/*.ts": [
       "bun run --filter @toku/server lint -- --fix",
       "bunx prettier --write"
@@ -51,7 +55,7 @@
     "prettier-plugin-sql": "^0.20.0",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "turbo": "^2.10.11",
-    "typescript": "5.9.2"
+    "typescript": "^7.0.2"
   },
   "engines": {
     "node": ">=18"

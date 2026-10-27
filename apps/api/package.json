@@ -1,21 +1,27 @@
 {
   "name": "@toku/api",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
+  "module": "src/index.ts",
   "scripts": {
+    "build": "bun build src/index.ts --target bun --outdir dist",
     "check-types": "tsc --noEmit",
-    "dev": "bun run src/index.ts"
+    "dev": "bun run --env-file ../../.env --env-file .env.local --hot src/index.ts",
+    "lint": "eslint .",
+    "start": "bun run dist/index.js"
   },
   "dependencies": {
     "@toku/crypto": "workspace:*",
+    "@toku/db": "workspace:*",
     "@toku/env": "workspace:*",
     "@toku/protocol": "workspace:*",
     "@toku/redis": "workspace:*",
-    "eden": "^0.2.0",
-    "elysia": "1.4.30"
+    "elysia": "^1.4.30"
   },
   "devDependencies": {
+    "@toku/eslint-config": "workspace:*",
+    "@toku/typescript-config": "workspace:*",
     "@types/bun": "latest"
   }
 }
