@@ -15,7 +15,7 @@ Bun + Turborepo monorepo. Packages never import each other; `apps/*` compose the
 ```
 toku/
 ├── apps/
-│   ├── server/          # @toku/server — Fastify HTTP+WS (scaffold next)
+│   ├── server/          # @toku/server — Elysia HTTP+WS (scaffold next)
 │   ├── worker/          # @toku/worker — BullMQ sweeps (planned)
 │   └── web/             # @toku/client — Vite React chat UI (planned)
 ├── packages/
