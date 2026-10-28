@@ -1,17 +1,23 @@
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
-import { databaseUrlSchema, nodeEnvSchema, redisUrlSchema } from "./shared";
+import {
+  databaseUrlSchema,
+  logLevelSchema,
+  nodeEnvSchema,
+  redisUrlSchema,
+} from "./shared";
 
-// combined http+ws server (fastify) — single port for http and websocket upgrade
+// combined http+ws server (elysia) — single port for http and websocket upgrade
 // future split: keeping this as-is; splitting into api.ts (http) and realtime.ts (ws) reuses these schemas
 export const serverEnv = createEnv({
   server: {
     NODE_ENV: nodeEnvSchema,
-    PORT: z.coerce.number().int().positive().default(3000),
+    PORT: z.coerce.number().int().positive().default(8080),
     HOST: z.string().default("0.0.0.0"),
     DATABASE_URL: databaseUrlSchema,
     REDIS_URL: redisUrlSchema,
     WEB_ORIGIN: z.url().default("http://localhost:5173"),
+    LOG_LEVEL: logLevelSchema,
 
     // optional — for separate http/ws deploys only
     // WS_PORT: z.coerce.number().int().positive().optional(),
@@ -24,6 +30,7 @@ export const serverEnv = createEnv({
     DATABASE_URL: process.env.DATABASE_URL,
     REDIS_URL: process.env.REDIS_URL,
     WEB_ORIGIN: process.env.WEB_ORIGIN,
+    LOG_LEVEL: process.env.LOG_LEVEL,
   },
   emptyStringAsUndefined: true,
   skipValidation: process.env.SKIP_ENV_VALIDATION === "true",

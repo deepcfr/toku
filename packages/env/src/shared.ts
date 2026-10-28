@@ -5,6 +5,11 @@ export const nodeEnvSchema = z
   .enum(["development", "test", "production", "debug"])
   .default("development");
 
+// log level schema
+export const logLevelSchema = z
+  .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
+  .optional();
+
 // shared url schemas to keep error messages consistent
 export const redisUrlSchema = z.url();
 export const databaseUrlSchema = z.url();
