@@ -12,6 +12,7 @@
     "start": "bun run dist/index.js"
   },
   "dependencies": {
+    "@sinclair/typebox": "^0.34.0",
     "@toku/crypto": "workspace:*",
     "@toku/db": "workspace:*",
     "@toku/env": "workspace:*",

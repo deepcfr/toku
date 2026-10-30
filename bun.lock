@@ -24,6 +24,7 @@
       "name": "@toku/api",
       "version": "0.1.0",
       "dependencies": {
+        "@sinclair/typebox": "^0.34.0",
         "@toku/crypto": "workspace:*",
         "@toku/db": "workspace:*",
         "@toku/env": "workspace:*",

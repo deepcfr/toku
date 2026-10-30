@@ -106,7 +106,7 @@ export function createRateLimiter(
     };
   }
 
-  // throws RateLimitExceededError if not allowed — convenient for Fastify routes
+  // throws RateLimitExceededError if not allowed — convenient for Elysia routes
   async function assert(target: string): Promise<void> {
     const result = await check(target);
     if (!result.allowed) {
