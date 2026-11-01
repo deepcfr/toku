@@ -1,11 +1,9 @@
-// redis client singleton
-// but it has 3 clients - standard, pub, sub
 import { createRedisClients } from "@toku/redis";
 
-// shared redis client connection
+// 3 clients: standard commands, publisher, and dedicated subscriber (pub/sub blocks regular commands)
 export const redis = createRedisClients();
 
-// connect all the 3 clients concurrently
+// connects all three clients concurrently via TCP handshakes
 export async function connectRedis() {
   await Promise.all([
     redis.client.connect(),
@@ -14,7 +12,7 @@ export async function connectRedis() {
   ]);
 }
 
-// gracefully close open connections on shutdown
+// gracefully closes open connections on shutdown
 export async function disconnectRedis() {
   const closePromises = [redis.client, redis.pub, redis.sub].map(async cli => {
     if (cli.isOpen) {
@@ -26,5 +24,6 @@ export async function disconnectRedis() {
     }
   });
 
+  // allSettled ensures all sockets attempt to close even if one fails
   await Promise.allSettled(closePromises);
 }
