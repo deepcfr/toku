@@ -1,5 +1,7 @@
 import { createClient, type RedisClientType } from "redis";
 
+export type { RedisClientType };
+
 // we need different clients
 export interface RedisClients {
   client: RedisClientType;
