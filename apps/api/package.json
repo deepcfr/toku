@@ -12,6 +12,7 @@
     "start": "bun run dist/index.js"
   },
   "dependencies": {
+    "@elysia/cors": "^1.4.2",
     "@sinclair/typebox": "^0.34.0",
     "@toku/crypto": "workspace:*",
     "@toku/db": "workspace:*",
