@@ -1,11 +1,13 @@
+import type { ContentfulStatusCode } from "hono/utils/http-status";
+
 // extend the base Error class to use additonal properties
 export class AppError extends Error {
-  public readonly status: number;
+  public readonly status: ContentfulStatusCode;
   public readonly code: string;
   public readonly details?: unknown;
 
   constructor(
-    status: number,
+    status: ContentfulStatusCode,
     code: string,
     message: string,
     details?: unknown
