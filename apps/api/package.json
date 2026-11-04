@@ -12,14 +12,13 @@
     "start": "bun run dist/index.js"
   },
   "dependencies": {
-    "@elysia/cors": "^1.4.2",
-    "@sinclair/typebox": "^0.34.0",
+    "@hono/zod-validator": "^0.9.1",
     "@toku/crypto": "workspace:*",
     "@toku/db": "workspace:*",
     "@toku/env": "workspace:*",
     "@toku/protocol": "workspace:*",
     "@toku/redis": "workspace:*",
-    "elysia": "^1.4.30",
+    "hono": "^4.13.16",
     "pino": "^10.4.0"
   },
   "devDependencies": {

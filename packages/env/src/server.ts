@@ -7,7 +7,7 @@ import {
   redisUrlSchema,
 } from "./shared";
 
-// combined http+ws server (elysia) — single port for http and websocket upgrade
+// combined http+ws server (hono) — single port for http and websocket upgrade
 // future split: keeping this as-is; splitting into api.ts (http) and realtime.ts (ws) reuses these schemas
 export const serverEnv = createEnv({
   server: {
