@@ -37,7 +37,7 @@ src/
 │   └── errorHandler.ts   -- global app.onError (AppError, 429, 500) & app.notFound handlers
 │
 ├── routes/               -- HTTP REST controllers (Hono sub-apps)
-│   ├── index.ts          -- mounts sub-apps and exports route types for Hono RPC
+│   ├── index.ts          -- re-exports all routes (health, rooms)
 │   ├── health.ts         -- GET /health (liveness), GET /health/ready (readiness)
 │   ├── rooms.ts          -- POST /rooms, GET /rooms/:token
 │   ├── rooms.schema.ts   -- zod schemas for room input validation (zValidator)
