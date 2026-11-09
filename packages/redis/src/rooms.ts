@@ -6,6 +6,8 @@ export interface CreateRoomInput {
   roomToken: string;
   passwordHash: string;
   durationSeconds: number; // dynamic room TTL
+  maxParticipants?: number;
+  isDm?: boolean;
 }
 
 export interface RoomMemberKey {
@@ -22,6 +24,9 @@ export interface RoomMetadata {
   memberCount: number;
   passwordHash: string;
   lifetimeSeconds: number;
+  maxParticipants: number;
+  isDm: boolean;
+  remainingSeconds: number;
 }
 
 // Redis hash fields use snake_case by convention, it gives autocomplete for hSet/hGetAll
@@ -30,6 +35,8 @@ export type RoomHashFields = Record<string, string> & {
   member_count: string;
   password_hash: string;
   lifetime_seconds: string;
+  max_participants: string;
+  is_dm: string;
 };
 
 // create room store
@@ -47,15 +54,20 @@ export function createRoomStore(redis: RedisClientType) {
     roomToken,
     passwordHash,
     durationSeconds,
+    maxParticipants,
+    isDm = false,
   }: CreateRoomInput) {
     const { roomKey, membersKey, keyringKey } = getKeys(roomToken);
     const now = Date.now();
+    const capacity = maxParticipants ?? (isDm ? 2 : 16);
 
     const hash: RoomHashFields = {
       created_at: String(now),
       member_count: "0",
       password_hash: passwordHash,
       lifetime_seconds: String(durationSeconds),
+      max_participants: String(capacity),
+      is_dm: isDm ? "1" : "0",
     };
 
     // use MULTI/EXEC for handling race condition
@@ -72,16 +84,29 @@ export function createRoomStore(redis: RedisClientType) {
   // return room metadata — hGetAll returns Record<string,string> so we cast to RoomHashFields for suggestions
   async function getRoom(roomToken: string): Promise<RoomMetadata | null> {
     const roomKey = RedisKeys.room(roomToken);
-    const data = (await redis.hGetAll(roomKey)) as Partial<RoomHashFields>;
+    const [data, remainingSeconds] = await Promise.all([
+      redis.hGetAll(roomKey) as Promise<Partial<RoomHashFields>>,
+      redis.ttl(roomKey),
+    ]);
 
-    if (!data || Object.keys(data).length === 0) return null;
+    if (!data || Object.keys(data).length === 0 || remainingSeconds <= 0)
+      return null;
 
     return {
       createdAt: Number(data.created_at ?? 0),
       memberCount: Number(data.member_count ?? 0),
       passwordHash: data.password_hash ?? "",
       lifetimeSeconds: Number(data.lifetime_seconds ?? 86400),
+      maxParticipants: Number(data.max_participants ?? 16),
+      isDm: data.is_dm === "1",
+      remainingSeconds,
     };
+  }
+
+  // atomically deletes all the keys for a room
+  async function deleteRoom(roomToken: string) {
+    const { roomKey, membersKey, keyringKey } = getKeys(roomToken);
+    await redis.del([roomKey, membersKey, keyringKey]);
   }
 
   // add a member in the room
@@ -148,6 +173,7 @@ export function createRoomStore(redis: RedisClientType) {
   return {
     createRoom,
     getRoom,
+    deleteRoom,
     addMember,
     removeMember,
     isMember,
