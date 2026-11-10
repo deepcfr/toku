@@ -8,13 +8,7 @@ import {
 import { db } from "../db";
 import { GoneError, NotFoundError, UnauthorizedError } from "../lib/errors";
 import { redis } from "../redis";
-
-export interface CreateRoomServiceInput {
-  durationSeconds: number;
-  passwordHash: string;
-  maxParticipants?: number;
-  isDm?: boolean;
-}
+import type { CreateRoomBody } from "../schemas/roomSchema";
 
 export interface PublicRoomMetadata {
   token: string;
@@ -31,7 +25,7 @@ const roomStore = createRoomStore(redis.client);
 
 // create room
 export async function createRoom(
-  input: CreateRoomServiceInput
+  input: CreateRoomBody
 ): Promise<PublicRoomMetadata> {
   const isDm = input.isDm ?? false;
   const token = randomToken(isDm ? "dm_" : "rm_");
