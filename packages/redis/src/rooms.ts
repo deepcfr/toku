@@ -5,6 +5,7 @@ import { RedisKeys } from "./keys";
 export interface CreateRoomInput {
   roomToken: string;
   passwordHash: string;
+  creatorKeyHash: string;
   durationSeconds: number; // dynamic room TTL
   maxParticipants?: number;
   isDm?: boolean;
@@ -23,6 +24,7 @@ export interface RoomMetadata {
   createdAt: number;
   memberCount: number;
   passwordHash: string;
+  creatorKeyHash: string;
   lifetimeSeconds: number;
   maxParticipants: number;
   isDm: boolean;
@@ -34,6 +36,7 @@ export type RoomHashFields = Record<string, string> & {
   created_at: string;
   member_count: string;
   password_hash: string;
+  creator_key_hash: string;
   lifetime_seconds: string;
   max_participants: string;
   is_dm: string;
@@ -53,6 +56,7 @@ export function createRoomStore(redis: RedisClientType) {
   async function createRoom({
     roomToken,
     passwordHash,
+    creatorKeyHash,
     durationSeconds,
     maxParticipants,
     isDm = false,
@@ -65,6 +69,7 @@ export function createRoomStore(redis: RedisClientType) {
       created_at: String(now),
       member_count: "0",
       password_hash: passwordHash,
+      creator_key_hash: creatorKeyHash,
       lifetime_seconds: String(durationSeconds),
       max_participants: String(capacity),
       is_dm: isDm ? "1" : "0",
@@ -96,6 +101,7 @@ export function createRoomStore(redis: RedisClientType) {
       createdAt: Number(data.created_at ?? 0),
       memberCount: Number(data.member_count ?? 0),
       passwordHash: data.password_hash ?? "",
+      creatorKeyHash: data.creator_key_hash ?? "",
       lifetimeSeconds: Number(data.lifetime_seconds ?? 86400),
       maxParticipants: Number(data.max_participants ?? 16),
       isDm: data.is_dm === "1",

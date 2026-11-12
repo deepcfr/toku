@@ -7,7 +7,7 @@ import {
   requestId,
   requestLogger,
 } from "./middleware";
-import { healthRoutes } from "./routes";
+import { healthRoutes, roomRoutes } from "./routes";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -22,7 +22,7 @@ app.use("*", prettyJSON());
 app.route("/health", healthRoutes);
 
 // mount all the routes, versioned
-export const apiRoutes = app.basePath("/v1/api");
+export const apiRoutes = app.basePath("/v1/api").route("/rooms", roomRoutes);
 
 // global error handler
 app.onError(errorHandler);

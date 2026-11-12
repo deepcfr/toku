@@ -11,6 +11,7 @@ export const RateLimitAction = {
   WS_CONNECT: "ws_connect",
   SEND_MESSAGE: "send_message",
   ROOM_CREATE: "room_create",
+  VERIFY_PASSWORD: "verify_password",
 } as const;
 
 export type RateLimitAction =

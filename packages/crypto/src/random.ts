@@ -28,7 +28,7 @@ export function bytesToHex(bytes: Uint8Array): string {
 }
 
 // room identity
-export function randomToken(kind: "rm_" | "dm_"): string {
+export function randomToken(kind: "rm_" | "dm_" | "cr_"): string {
   const rawBytes = randomBytes(16); // -> 32-character hex string
   const hexString = bytesToHex(rawBytes);
   return `${kind}${hexString}`;

@@ -27,7 +27,7 @@ export function getClientIp(c: Context) {
   );
 }
 
-export function rateLimiter(config: RateLimitMiddlewareConfig) {
+export function rateLimit(config: RateLimitMiddlewareConfig) {
   const limiter = createRateLimiter(redis.client, config);
 
   return createMiddleware<AppEnv>(async (c, next) => {

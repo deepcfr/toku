@@ -27,6 +27,15 @@ export const roomTokenParamsSchema = z.object({
   token: z.string().min(1, "Room token is required"),
 });
 
+// validates DELETE /rooms/:token req body (optional)
+export const purgeRoomSchema = z
+  .object({
+    creatorKey: z.string().optional(),
+    passwordProof: z.string().optional(),
+  })
+  .optional();
+
 export type CreateRoomBody = z.infer<typeof createRoomSchema>;
 export type VerifyPasswordBody = z.infer<typeof verifyPasswordSchema>;
 export type RoomTokenParams = z.infer<typeof roomTokenParamsSchema>;
+export type PurgeRoomBody = z.infer<typeof purgeRoomSchema>;

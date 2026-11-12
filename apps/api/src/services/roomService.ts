@@ -1,4 +1,4 @@
-import { randomToken, timingSafeEqual } from "@toku/crypto";
+import { bytesToHex, randomToken, sha256, timingSafeEqual } from "@toku/crypto";
 import type { RoomRow } from "@toku/db";
 import {
   createRoomStore,
@@ -6,7 +6,12 @@ import {
   type RoomMemberKey,
 } from "@toku/redis";
 import { db } from "../db";
-import { GoneError, NotFoundError, UnauthorizedError } from "../lib/errors";
+import {
+  ForbiddenError,
+  GoneError,
+  NotFoundError,
+  UnauthorizedError,
+} from "../lib/errors";
 import { redis } from "../redis";
 import type { CreateRoomBody } from "../schemas/roomSchema";
 
@@ -20,18 +25,39 @@ export interface PublicRoomMetadata {
   expiresAt: number;
 }
 
+export interface CreateRoomResult extends PublicRoomMetadata {
+  creatorKey: string;
+}
+
+export interface VerifyPasswordInput {
+  token: string;
+  passwordProof: string;
+}
+
+export interface PurgeRoomInput {
+  token: string;
+  creatorKey?: string;
+  passwordProof?: string;
+}
+
 // create the room store
 const roomStore = createRoomStore(redis.client);
 
 // create room
 export async function createRoom(
   input: CreateRoomBody
-): Promise<PublicRoomMetadata> {
+): Promise<CreateRoomResult> {
   const isDm = input.isDm ?? false;
   const token = randomToken(isDm ? "dm_" : "rm_");
+  const creatorKey = randomToken("cr_");
   const now = Date.now();
   const expiresAt = now + input.durationSeconds * 1000;
-  const maxParticipants = input.maxParticipants ?? (isDm ? 2 : 16);
+  const maxParticipants = isDm ? 2 : (input.maxParticipants ?? 16);
+
+  // hash the creatorKey before storing into redis
+  const creatorKeyHash = bytesToHex(
+    await sha256(new TextEncoder().encode(creatorKey))
+  );
 
   // insert into db
   await db`
@@ -43,6 +69,7 @@ export async function createRoom(
   await roomStore.createRoom({
     roomToken: token,
     passwordHash: input.passwordHash,
+    creatorKeyHash,
     durationSeconds: input.durationSeconds,
     isDm,
     maxParticipants,
@@ -50,6 +77,7 @@ export async function createRoom(
 
   return {
     token,
+    creatorKey,
     memberCount: 0,
     maxParticipants,
     remainingSeconds: input.durationSeconds,
@@ -108,15 +136,14 @@ export async function getRoomMetadata(
 
 // verify the passwordHash
 export async function verifyPassword(
-  token: string,
-  clientPasswordProof: string
+  input: VerifyPasswordInput
 ): Promise<boolean> {
-  const cached = await roomStore.getRoom(token);
+  const cached = await roomStore.getRoom(input.token);
   if (!cached) throw new NotFoundError("Room not found");
 
   const encoder = new TextEncoder();
   const storedBytes = encoder.encode(cached.passwordHash);
-  const clientBytes = encoder.encode(clientPasswordProof);
+  const clientBytes = encoder.encode(input.passwordProof);
 
   const isValid = timingSafeEqual(storedBytes, clientBytes);
   if (!isValid) throw new UnauthorizedError("Invalid room password proof");
@@ -125,10 +152,63 @@ export async function verifyPassword(
 }
 
 // delete room and all its related data
-export async function purgeRoom(token: string): Promise<void> {
-  await roomStore.deleteRoom(token);
+export async function purgeRoom(input: PurgeRoomInput): Promise<void> {
+  const cached = await roomStore.getRoom(input.token);
+  if (!cached) throw new NotFoundError("Room not found");
+
+  const encoder = new TextEncoder();
+
+  if (cached.isDm) {
+    // for 1:1 dm, either the creatorKey or the shared passwordProof can delete for both
+    let authorized = false;
+
+    // the creator wants to delete it
+    if (input.creatorKey) {
+      const inputHash = bytesToHex(
+        await sha256(encoder.encode(input.creatorKey))
+      );
+
+      if (
+        timingSafeEqual(
+          encoder.encode(cached.creatorKeyHash),
+          encoder.encode(inputHash)
+        )
+      )
+        authorized = true;
+    }
+
+    // the other user
+    if (!authorized && input.passwordProof) {
+      if (
+        timingSafeEqual(
+          encoder.encode(cached.passwordHash),
+          encoder.encode(input.passwordProof)
+        )
+      )
+        authorized = true;
+    }
+
+    if (!authorized)
+      throw new UnauthorizedError("Invalid creator key or password proof");
+  } else {
+    // group room -> only the creator can delete the room
+    if (!input.creatorKey)
+      throw new ForbiddenError("Only the room creator can delete this room");
+
+    const inputHash = bytesToHex(
+      await sha256(encoder.encode(input.creatorKey))
+    );
+    const isValid = timingSafeEqual(
+      encoder.encode(cached.creatorKeyHash),
+      encoder.encode(inputHash)
+    );
+
+    if (!isValid) throw new ForbiddenError("Invalid creator key");
+  }
+
+  await roomStore.deleteRoom(input.token);
   await db`
-    DELETE FROM rooms WHERE token = ${token}
+    DELETE FROM rooms WHERE token = ${input.token}
   `;
 }
 
