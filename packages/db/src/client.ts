@@ -12,7 +12,6 @@ export function createDbClient(
     ssl: options.ssl ?? false,
     transform: {
       undefined: null,
-      ...postgres.camel,
     },
     ...options,
   });

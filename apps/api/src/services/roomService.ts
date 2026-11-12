@@ -117,8 +117,7 @@ export async function getRoomMetadata(
   if (!row) throw new NotFoundError("Room not found");
 
   const now = Date.now();
-  const createdAt = (row.createdAt ?? row.created_at ?? new Date()).getTime();
-  const expiresAt = (row.expiresAt ?? row.expires_at ?? new Date()).getTime();
+  const expiresAt = row.expires_at.getTime();
   if (expiresAt <= now) throw new GoneError("Room has expired");
 
   const remainingSeconds = Math.max(0, Math.floor((expiresAt - now) / 1000));
@@ -130,7 +129,7 @@ export async function getRoomMetadata(
     maxParticipants: isDm ? 2 : 16,
     remainingSeconds,
     isDm,
-    createdAt,
+    createdAt: row.created_at.getTime(),
     expiresAt,
   };
 }
