@@ -14,7 +14,7 @@ export const RedisKeys = {
   ban: (identityHash: string) => `toku:ban:${identityHash}`,
 } as const;
 
-// keys note(im lazy to save them in obsidian)
+// Redis key architecture overview:
 /**
  * roomToken = lobby
  * roomKey = toku:room:lobby = room metadata key. stores necessary information about the room. uses hash, each field can be updated independently in O(1) time

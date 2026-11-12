@@ -2,11 +2,11 @@
 
 > **Temporary v1 README** — bare-bones on purpose. Updated and polished as the repo evolves.
 
-Anonymous end-to-end-encrypted ephemeral chat. No signups, no accounts — a keypair generated in your browser is your identity. Rooms live on a countdown, messages can burn, and the server routes opaque bytes it can never read.
+Anonymous end-to-end-encrypted ephemeral chat. No signups, no accounts — a keypair generated in your browser is your identity. Rooms live on a countdown, messages self-destruct, and the server routes opaque bytes it can never read.
 
 ## Aim
 
-A polished, real-time E2EE chat product: DMs and password-protected rooms with forward secrecy, offline delivery, ghost mode, burn-after-read, and self-destructing everything — built in the open, one feature at a time.
+A polished, real-time E2EE chat product: DMs and password-protected rooms with forward secrecy, offline delivery, stealth mode, message self-destruction (burn-after-read), and ephemeral lifecycles — built in the open, one feature at a time.
 
 ## Structure
 
@@ -47,10 +47,10 @@ toku/
 3. E2EE DMs
 4. E2EE rooms
 5. One-time invite links
-6. Ghost mode
+6. Stealth mode
 7. Message lifetime timers
 8. Burn after read (defined as after delivery/ACK)
-9. Burn animation
+9. Message self-destruct animation
 10. Screenshot overlay (focus-loss based)
 11. Self-destructing rooms
 

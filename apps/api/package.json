@@ -9,7 +9,8 @@
     "check-types": "tsc --noEmit",
     "dev": "bun run --env-file ../../.env --env-file .env.local --hot src/index.ts",
     "lint": "eslint .",
-    "start": "bun run dist/index.js"
+    "start": "bun run dist/index.js",
+    "test": "bun test --env-file ../../.env"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.9.1",

@@ -8,8 +8,10 @@ export type IncidentLabel =
 // rooms table
 export interface RoomRow {
   token: string;
-  created_at: Date;
-  expires_at: Date;
+  createdAt: Date;
+  expiresAt: Date;
+  created_at?: Date;
+  expires_at?: Date;
 }
 
 // room_messages table
