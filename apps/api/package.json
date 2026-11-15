@@ -19,6 +19,7 @@
     "@toku/env": "workspace:*",
     "@toku/protocol": "workspace:*",
     "@toku/redis": "workspace:*",
+    "bullmq": "^6.7.6",
     "hono": "^4.13.16",
     "pino": "^10.4.0",
     "zod": "^4.6.7"

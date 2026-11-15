@@ -2,6 +2,7 @@ import app from "./app";
 import { config } from "./config";
 import { db } from "./db";
 import { logger } from "./lib/logger";
+import { closeQueue } from "./queue";
 import { connectRedis, disconnectRedis } from "./redis";
 
 let server: ReturnType<typeof Bun.serve> | undefined;
@@ -33,6 +34,10 @@ async function shutdown(signal: string) {
       await server.stop();
       logger.info("--- HTTP server stopped accepting new connections ---");
     }
+
+    // drain & close BullMQ worker queue
+    await closeQueue();
+    logger.info("--- BullMQ worker queue closed ---");
 
     // disconnect redis clients
     await disconnectRedis();
