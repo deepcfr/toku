@@ -21,7 +21,7 @@ export function createPresenceStore(redis: RedisClientType) {
     });
   }
 
-  // called every 10s to while ws is open to keep the 20s lease alive
+  // called every 7s to while ws is open to keep the 20s lease alive
   async function heartbeat({ roomToken, pubKeyHash }: RoomMemberKey) {
     const key = RedisKeys.presence(roomToken, pubKeyHash);
     await redis.set(key, "1", {
