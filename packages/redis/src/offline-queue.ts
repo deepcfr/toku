@@ -3,13 +3,13 @@
 import { RESP_TYPES, type RedisClientType } from "redis";
 import { RedisKeys } from "./keys";
 
-interface BaseOfflineQueue {
+export interface BaseOfflineQueue {
   pubKeyHash: string;
   roomToken: string;
   msgId: number;
 }
 
-interface Enqueue extends BaseOfflineQueue {
+export interface Enqueue extends BaseOfflineQueue {
   payload: Uint8Array;
 }
 

@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS delivery_receipts (
   status delivery_status NOT NULL DEFAULT 'PENDING',
   attempted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   delivered_at TIMESTAMPTZ,
-  FOREIGN KEY (room_token, message_id) REFERENCES room_messages (room_token, msg_id) ON DELETE CASCADE,
+  FOREIGN KEY (room_token, message_id) REFERENCES room_messages (room_token, message_id) ON DELETE CASCADE,
   CONSTRAINT unique_room_msg_recipient UNIQUE (room_token, recipient_hash, message_id)
 );
 

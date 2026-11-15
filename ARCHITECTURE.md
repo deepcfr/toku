@@ -28,7 +28,7 @@ Stateless horizontally scaled WebSocket nodes.
    - For each recipient, Server 1 checks `EXISTS toku:presence:<roomToken>:<recipientHash>`.
    - **If Online (Lease exists)**: Do nothing for the offline queue; rely on the live Pub/Sub broadcast.
    - **If Offline (No lease)**: Enqueue the raw `Uint8Array` frame into the recipient's Redis Hash cache (`toku:offline:<recipientHash>`).
-4. **Database Offloading**: Server 1 pushes a `TRACK_MESSAGE` job onto the BullMQ / Redis worker queue (`toku:db:worker:queue`) so the event loop never blocks on disk writes.
+4. **Database Offloading**: Server 1 pushes a `TRACK_MESSAGE` job onto the BullMQ / Redis worker queue (`toku:worker:queue`) so the event loop never blocks on disk writes.
 5. **Live Fan-Out (Redis Pub/Sub)**: Server 1 publishes the untouched original `Uint8Array` bytes to `toku:channel:<roomToken>`. Subscribed servers (e.g., Server 2) receive the raw buffer without decoding it and flush it straight down matching local WebSockets.
 6. **ACK Handling**: When Server 2 receives a `DELIVERY_ACK` frame from a client:
    - It executes an $O(1)$ surgical eviction on Redis: `HDEL toku:offline:<recipientHash> "<roomToken>:<msgId>"`.
@@ -49,7 +49,7 @@ Stateless horizontally scaled WebSocket nodes.
 
 ### Layer D: The Asynchronous Worker & PostgreSQL Vault (`apps/worker` & `packages/db`)
 
-- **Background Worker (BullMQ)**: Consumes jobs from `toku:db:worker:queue` to isolate slow relational disk writes from live WebSockets.
+- **Background Worker (BullMQ)**: Consumes jobs from `toku:worker:queue` to isolate slow relational disk writes from live WebSockets.
   - `TRACK_MESSAGE`: Inserts encrypted payload into `room_messages` and inserts `PENDING` rows into `delivery_receipts` for all recipients.
   - `MARK_DELIVERED`: Updates `delivery_receipts` row to `status = 'DELIVERED'` and sets `delivered_at = NOW()`.
   - `LOG_INCIDENT`: Asynchronously writes rate-limit or malformed frame violations to `security_incident_log`.
@@ -174,7 +174,7 @@ Server 1 splits execution into three parallel paths:
 
 #### Path 1: Asynchronous Durable Persistence (For Everyone)
 
-- Server 1 pushes a `TRACK_MESSAGE` JSON job to BullMQ (`toku:db:worker:queue`) via `LPUSH`.
+- Server 1 pushes a `TRACK_MESSAGE` job to BullMQ (`toku-worker`) via `workerQueue.add()` (BullMQ manages its own internal Redis streams/sets and does not use raw `LPUSH`).
 - Takes `< 0.5ms` in Redis, offloading slow PostgreSQL disk I/O (`2ms–50ms`) from the live WebSocket event loop.
 - The worker executes:
   1. Inserts binary `ciphertext` and `iv` into `room_messages` as native `BYTEA` columns with composite primary key `(room_token, message_id)`.
@@ -226,9 +226,11 @@ Server 1 splits execution into three parallel paths:
 2. Server queries PostgreSQL:
    ```sql
    SELECT
+     m.room_token,
      m.message_id,
      m.ciphertext,
-     m.iv
+     m.iv,
+     m.created_at
    FROM
      delivery_receipts dr
      JOIN room_messages m ON m.room_token = dr.room_token
@@ -237,7 +239,9 @@ Server 1 splits execution into three parallel paths:
    WHERE
      dr.recipient_hash = $1
      AND dr.status = 'PENDING'
-     AND r.expires_at > NOW();
+     AND r.expires_at > NOW()
+   ORDER BY
+     m.message_id ASC;
    ```
 3. Partial index `idx_delivery_pending_recipient` enables microsecond lookup.
 4. Server repacks `BYTEA` data into binary `CHAT_MESSAGE` frames, dispatches to Client C $\rightarrow$ Client C ACKs $\rightarrow$ BullMQ marks `DELIVERED`.
@@ -246,3 +250,160 @@ Server 1 splits execution into three parallel paths:
 
 - **Redis Cleanup**: When a room is created, all keys receive `durationSeconds`. On join/leave, `redis.ttl(roomKey)` restamps all sub-keys with remaining time.
 - **Postgres Cleanup**: Periodic cron runs `DELETE FROM rooms WHERE expires_at < NOW()`. Cascades automatically via `ON DELETE CASCADE` to delete `room_messages` and `delivery_receipts`.
+
+---
+
+## 6. Background Worker Job Specification (`apps/worker`)
+
+All asynchronous database mutations and periodic maintenance tasks are offloaded to **`apps/worker`** via BullMQ on Redis queue `toku-worker`. This guarantees that the WebSocket gateway never waits on PostgreSQL disk I/O.
+
+### 6.1 Queue Configuration & Resilience Strategy (`apps/api/src/queue.ts`)
+
+The BullMQ producer queue (`toku-worker`) is configured with production-grade reliability parameters:
+
+- **`attempts: 3`**: Automatic retries if PostgreSQL encounters a momentary timeout, connection pool saturation, or query deadlock.
+- **`backoff: { type: 'exponential', delay: 1000, jitter: 0.5 }`**: Eliminates the "lockstep march" / thundering herd problem by scattering retry wakeups randomly across a $\pm 50\%$ time window when PostgreSQL recovers.
+- **`removeOnComplete: true`**: Crucial for high-throughput chat; purges finished jobs immediately from Redis RAM to prevent memory leaks and out-of-memory (OOM) crashes.
+- **`removeOnFail: { count: 1000 }`**: Caps retained error logs to the last 1,000 jobs so failed executions can be debugged without leaking memory indefinitely.
+
+### 6.2 Worker Job Catalog (Master Table)
+
+| Job Name                     | Type  | Trigger / Schedule                                                     | Queue / Target            | Primary Database Action & Invariant                                                                                                                                                | Target Tables                                  |
+| :--------------------------- | :---- | :--------------------------------------------------------------------- | :------------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------- |
+| **`TRACK_MESSAGE`**          | Event | `CHAT_MESSAGE` binary frame received & validated                       | `toku-worker`             | Atomically inserts ciphertext + IV into `room_messages`, then creates `PENDING` rows in `delivery_receipts` for all room recipients.                                               | `room_messages`, `delivery_receipts`           |
+| **`MARK_DELIVERED`**         | Event | `DELIVERY_ACK` binary frame received from recipient                    | `toku-worker`             | Updates receipt `status = 'DELIVERED'` and sets `delivered_at = NOW()`. If burn-after-read is enabled and all recipients ACKed, purges message from `room_messages`.               | `delivery_receipts`, `room_messages`           |
+| **`LOG_INCIDENT`**           | Event | Malformed frame, invalid magic byte, room spam, or rate limit exceeded | `toku-worker`             | Writes incident record to `security_incident_log`. If identity exceeds threshold ($\ge 5$ violations in 10m), auto-creates temporary ban in `active_bans` and sets Redis edge key. | `security_incident_log`, `active_bans`         |
+| **`CLEANUP_EXPIRED_ROOMS`**  | Cron  | Every 15 minutes (`*/15 * * * *`)                                      | Worker Internal Scheduler | Deletes expired rooms (`WHERE expires_at < NOW()`). Relies on `ON DELETE CASCADE` to atomically purge all child messages and receipts.                                             | `rooms` (`room_messages`, `delivery_receipts`) |
+| **`CLEANUP_EXPIRED_BANS`**   | Cron  | Hourly (`0 * * * *`)                                                   | Worker Internal Scheduler | Prunes expired bans (`WHERE expires_at < NOW()`) to keep the table compact for microsecond inline index scans on socket connect.                                                   | `active_bans`                                  |
+| **`CLEANUP_STALE_RECEIPTS`** | Cron  | Daily (`0 2 * * *`)                                                    | Worker Internal Scheduler | Marks unclaimed offline receipts as `'EXPIRED'` if room reached absolute expiration deadline without delivery.                                                                     | `delivery_receipts`                            |
+| **`CLEANUP_INCIDENT_LOGS`**  | Cron  | Weekly (`0 3 * * 0`)                                                   | Worker Internal Scheduler | Permanently prunes security logs older than 7 days to preserve zero-knowledge, privacy-first data retention principles.                                                            | `security_incident_log`                        |
+
+### 6.3 Event-Driven Job Definitions
+
+#### 1. `TRACK_MESSAGE`
+
+- **Trigger**: Server validates an incoming binary `CHAT_MESSAGE` frame and fans it out.
+- **Job Payload**:
+  ```json
+  {
+    "type": "TRACK_MESSAGE",
+    "roomToken": "rm_xxxxxxxx",
+    "msgId": 42,
+    "ciphertextHex": "a1b2c3...",
+    "ivHex": "d4e5f6...",
+    "recipientHashes": ["hash_bob", "hash_carol"],
+    "createdAt": 1731675600000
+  }
+  ```
+- **Worker Execution (Atomic Transaction)**:
+  ```sql
+  -- 1. Insert encrypted payload into vault
+  INSERT INTO room_messages (room_token, message_id, ciphertext, iv, created_at)
+  VALUES ($1, $2, decode($3, 'hex'), decode($4, 'hex'), to_timestamp($5 / 1000.0));
+
+  -- 2. Create pending delivery receipts for all room recipients
+  INSERT INTO delivery_receipts (room_token, recipient_hash, message_id, status)
+  VALUES ($1, unnest($recipients::text[]), $2, 'PENDING');
+  ```
+
+#### 2. `MARK_DELIVERED`
+
+- **Trigger**: Server receives a `DELIVERY_ACK` binary frame from a recipient.
+- **Job Payload**:
+  ```json
+  {
+    "type": "MARK_DELIVERED",
+    "roomToken": "rm_xxxxxxxx",
+    "msgId": 42,
+    "recipientHash": "hash_bob",
+    "deliveredAt": 1731675601200
+  }
+  ```
+- **Worker Execution**:
+  ```sql
+  -- 1. Mark receipt delivered
+  UPDATE delivery_receipts
+  SET
+    status = 'DELIVERED',
+    delivered_at = to_timestamp($4 / 1000.0)
+  WHERE
+    room_token = $1
+    AND message_id = $2
+    AND recipient_hash = $3;
+  
+  -- 2. Burn-after-read check (optional flag):
+  -- If all recipients have delivered_at set, purge ciphertext immediately:
+  DELETE FROM room_messages
+  WHERE
+    room_token = $1
+    AND message_id = $2
+    AND NOT EXISTS (
+      SELECT
+        1
+      FROM
+        delivery_receipts
+      WHERE
+        room_token = $1
+        AND message_id = $2
+        AND status = 'PENDING'
+    );
+  ```
+
+#### 3. `LOG_INCIDENT`
+
+- **Trigger**: Ingress gateway detects invalid magic bytes, frame boundary overruns, or rate-limit violations.
+- **Job Payload**:
+  ```json
+  {
+    "type": "LOG_INCIDENT",
+    "identityHash": "hash_attacker",
+    "incidentType": "MALFORMED_FRAME",
+    "roomToken": "rm_xxxxxxxx",
+    "occurredAt": 1731675602000
+  }
+  ```
+- **Worker Execution**:
+  ```sql
+  -- 1. Record security audit log
+  INSERT INTO
+    security_incident_log (
+      identity_hash,
+      incident_type,
+      room_token,
+      occurred_at
+    )
+  VALUES
+    ($1, $2, $3, to_timestamp($4 / 1000.0));
+  
+  -- 2. Check escalation threshold (>= 5 incidents in last 10 minutes)
+  -- If threshold tripped, enforce 1-hour active ban:
+  INSERT INTO
+    active_bans (identity_hash, reason, banned_at, expires_at)
+  SELECT
+    $1,
+    'Automated rate limit / protocol breach escalation',
+    NOW(),
+    NOW() + INTERVAL '1 hour'
+  WHERE
+    (
+      SELECT
+        COUNT(*)
+      FROM
+        security_incident_log
+      WHERE
+        identity_hash = $1
+        AND occurred_at > NOW() - INTERVAL '10 minutes'
+    ) >= 5
+  ON CONFLICT (identity_hash) DO UPDATE
+  SET
+    expires_at = NOW() + INTERVAL '1 hour';
+  ```
+
+### 6.4 Scheduled Sweeper Jobs (Cron Maintenance)
+
+| Cron Job                 | Frequency                     | SQL Operation                                                                                                                                    | Purpose                                                                                                                |
+| :----------------------- | :---------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------- |
+| `CLEANUP_EXPIRED_ROOMS`  | Every 15 min (`*/15 * * * *`) | `DELETE FROM rooms WHERE expires_at < NOW();`                                                                                                    | Master room purge. Cascades via foreign keys to atomically wipe all child `room_messages` and `delivery_receipts`.     |
+| `CLEANUP_EXPIRED_BANS`   | Hourly (`0 * * * *`)          | `DELETE FROM active_bans WHERE expires_at < NOW();`                                                                                              | Keeps the `active_bans` index shallow to maintain sub-millisecond query performance for inline connection gate checks. |
+| `CLEANUP_STALE_RECEIPTS` | Daily (`0 2 * * *`)           | `UPDATE delivery_receipts SET status = 'EXPIRED' WHERE status = 'PENDING' AND room_token IN (SELECT token FROM rooms WHERE expires_at < NOW());` | Closes out abandoned offline message receipts for rooms that have reached their absolute lifespan.                     |
+| `CLEANUP_INCIDENT_LOGS`  | Weekly (`0 3 * * 0`)          | `DELETE FROM security_incident_log WHERE occurred_at < NOW() - INTERVAL '7 days';`                                                               | Enforces zero-knowledge data retention by wiping security audit logs older than 7 days.                                |
