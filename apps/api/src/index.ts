@@ -4,6 +4,7 @@ import { db } from "./db";
 import { logger } from "./lib/logger";
 import { closeQueue } from "./queue";
 import { connectRedis, disconnectRedis } from "./redis";
+import { websocket } from "./ws/adapter";
 
 let server: ReturnType<typeof Bun.serve> | undefined;
 let isShuttingDown = false; // guard to prevent duplicate concurrent shutdowns (e.g. repeated Ctrl+C)
@@ -81,6 +82,7 @@ async function startServer() {
       port: config.PORT,
       hostname: config.HOST,
       fetch: app.fetch,
+      websocket,
     });
 
     logger.info(
