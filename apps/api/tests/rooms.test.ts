@@ -1,8 +1,8 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { beforeAll, describe, expect, it } from "bun:test";
 import { RedisKeys } from "@toku/redis";
 import app from "../src/app";
 import { db } from "../src/db";
-import { connectRedis, disconnectRedis, redis } from "../src/redis";
+import { connectRedis, redis } from "../src/redis";
 
 let testIpCounter = 1;
 function nextTestIp() {

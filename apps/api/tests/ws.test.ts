@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import type { WSContext } from "hono/ws";
 import { encode, MessageType } from "@toku/protocol";
-import { closeQueue, workerQueue } from "../src/queue";
+import { workerQueue } from "../src/queue";
 import { connectRedis } from "../src/redis";
 import {
   queueOfflineMessage,

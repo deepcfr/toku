@@ -1,7 +1,7 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { beforeAll, describe, expect, it } from "bun:test";
 import { db } from "../src/db";
-import { closeQueue, workerQueue } from "../src/queue";
-import { connectRedis, disconnectRedis } from "../src/redis";
+import { workerQueue } from "../src/queue";
+import { connectRedis } from "../src/redis";
 import {
   broadcastToRoom,
   evictOfflineMessage,
