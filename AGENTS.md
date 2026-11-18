@@ -155,9 +155,9 @@ When assisting or collaborating on this codebase, AI agents must adhere strictly
 1. **Pedagogical Collaboration ("Teach me everything so that I can write on my own")**:
    - Guide, teach, and explain mechanics step-by-step. Break problems into modular, manageable concepts.
    - Do not dump large pre-written blocks of code or complete tasks ahead of the developer unless explicitly requested.
-2. **Strictly NO Mermaid Diagrams**:
-   - Never generate Mermaid diagrams (`mermaid` code blocks) anywhere in chat or artifacts.
-   - Use structured Markdown lists, tables, or clean ASCII outlines for workflows and architectures.
+2. **Mermaid Diagrams**:
+   - Use Mermaid for workflows in repository architecture documentation when it improves clarity.
+   - Do not add Mermaid to chat or generated artifacts unless the developer explicitly requests it; prefer Markdown lists or tables otherwise.
 3. **Theme-Agnostic Terminology**:
    - Maintain professional, neutral terminology.
    - Strictly avoid fantasy, gaming, or RPG-themed terms (e.g., "campfire", "ember", "obsidian", "creature", "tamagotchi", "hatch", "flame"). Use accurate technical domain names (rooms, tokens, members, participants, messages, leases, relays).

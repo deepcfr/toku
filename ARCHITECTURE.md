@@ -141,6 +141,31 @@ CREATE INDEX IF NOT EXISTS idx_active_bans_expiry ON active_bans (expires_at);
 
 ## 5. End-to-End Message Delivery Lifecycle (Step-by-Step)
 
+### Message Delivery Flowchart
+
+```mermaid
+flowchart TD
+  Sender["Sender encrypts message"] --> Gateway["WebSocket gateway"]
+  Gateway --> Member{"Valid room member?"}
+  Member -->|"No"| Drop["Drop frame"]
+  Member -->|"Yes"| Queue["TRACK_MESSAGE job"]
+  Queue --> Worker["BullMQ worker"]
+  Worker --> DB[("PostgreSQL")]
+  Gateway --> Presence{"Recipient online?"}
+  Presence -->|"Yes"| PubSub[("Redis Pub/Sub")]
+  PubSub --> Recipient["Deliver ciphertext"]
+  Presence -->|"No"| Offline[("Redis offline hash")]
+  Recipient --> ACK["DELIVERY_ACK"]
+  Offline -->|"On reconnect"| Recipient
+  Offline -. "Expires after 10 min" .-> Fallback["Query pending receipts"]
+  Fallback --> DB
+  Fallback --> Recipient
+  ACK --> Evict["Evict offline frame"]
+  ACK --> Delivered["MARK_DELIVERED job"]
+  Evict --> Delivered
+  Delivered --> Worker
+```
+
 Tracing a single message packet millisecond-by-millisecond from Client A to Client B (online) and Client C (offline):
 
 ### Stage 1: On-Device Encryption & Binary Framing (Client A)
