@@ -231,6 +231,11 @@ export async function isRoomMember(input: RoomMemberKey): Promise<boolean> {
   return roomStore.isMember(input);
 }
 
+// fetch all member hashes in the room
+export async function getRoomMembers(roomToken: string): Promise<string[]> {
+  return roomStore.getMembers(roomToken);
+}
+
 // fetch all public keys in the room for end-to-end encryption
 export async function getRoomPublicKeys(
   roomToken: string

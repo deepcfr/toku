@@ -168,6 +168,12 @@ export function createRoomStore(redis: RedisClientType) {
     return (await redis.sIsMember(membersKey, pubKeyHash)) === 1;
   }
 
+  // returns all member hashes in the room
+  async function getMembers(roomToken: string): Promise<string[]> {
+    const { membersKey } = getKeys(roomToken);
+    return await redis.sMembers(membersKey);
+  }
+
   // fetches all participants' public keys for pairwise X3DH derivation
   async function getAllPublicKeys(
     roomToken: string
@@ -183,6 +189,7 @@ export function createRoomStore(redis: RedisClientType) {
     addMember,
     removeMember,
     isMember,
+    getMembers,
     getAllPublicKeys,
   };
 }
