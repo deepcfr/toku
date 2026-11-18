@@ -25,11 +25,6 @@ beforeAll(async () => {
   await connectRedis();
 });
 
-afterAll(async () => {
-  await disconnectRedis();
-  await db.end();
-});
-
 describe("Room HTTP API Lifecycle", () => {
   describe("POST /v1/api/rooms (Create Room)", () => {
     it("creates a group room with defaults and persists to both Postgres and Redis", async () => {

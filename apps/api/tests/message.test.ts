@@ -21,12 +21,6 @@ beforeAll(async () => {
   await connectRedis();
 });
 
-afterAll(async () => {
-  await closeQueue();
-  await disconnectRedis();
-  await db.end();
-});
-
 describe("Message Service", () => {
   const testRoomToken = `rm_test_${Date.now()}`;
   const testRecipient = `hash_recipient_${Date.now()}`;

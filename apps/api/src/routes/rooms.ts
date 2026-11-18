@@ -14,6 +14,7 @@ import {
   verifyPassword,
 } from "../services/roomService";
 import type { AppEnv } from "../types";
+import { wsRoutes } from "../ws";
 
 export const roomRoutes = new Hono<AppEnv>()
   // create a room
@@ -94,4 +95,6 @@ export const roomRoutes = new Hono<AppEnv>()
         200
       );
     }
-  );
+  )
+  // real-time websocket gateway
+  .route("/", wsRoutes);

@@ -3,13 +3,16 @@ import { createRedisClients } from "@toku/redis";
 // 3 clients: standard commands, publisher, and dedicated subscriber (pub/sub blocks regular commands)
 export const redis = createRedisClients();
 
-// connects all three clients concurrently via TCP handshakes
+// connects all three clients concurrently via TCP handshakes (idempotent if already open)
 export async function connectRedis() {
-  await Promise.all([
-    redis.client.connect(),
-    redis.pub.connect(),
-    redis.sub.connect(),
-  ]);
+  const connectPromises = [redis.client, redis.pub, redis.sub].map(
+    async cli => {
+      if (!cli.isOpen) {
+        await cli.connect();
+      }
+    }
+  );
+  await Promise.all(connectPromises);
 }
 
 // gracefully closes open connections on shutdown
