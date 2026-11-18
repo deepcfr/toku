@@ -27,6 +27,19 @@ export function bytesToHex(bytes: Uint8Array): string {
     .join("");
 }
 
+// converts hex text into raw binary array
+export function hexToBytes(hex: string): Uint8Array {
+  if (hex.length % 2 !== 0) {
+    throw new RangeError("hex string must have an even length");
+  }
+
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+  }
+  return bytes;
+}
+
 // room identity
 export function randomToken(kind: "rm_" | "dm_" | "cr_"): string {
   const rawBytes = randomBytes(16); // -> 32-character hex string
