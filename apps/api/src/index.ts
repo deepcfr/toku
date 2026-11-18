@@ -5,6 +5,7 @@ import { logger } from "./lib/logger";
 import { closeQueue } from "./queue";
 import { connectRedis, disconnectRedis } from "./redis";
 import { websocket } from "./ws/adapter";
+import { connectionRegistry } from "./ws/registry";
 
 let server: ReturnType<typeof Bun.serve> | undefined;
 let isShuttingDown = false; // guard to prevent duplicate concurrent shutdowns (e.g. repeated Ctrl+C)
@@ -35,6 +36,10 @@ async function shutdown(signal: string) {
       await server.stop();
       logger.info("--- HTTP server stopped accepting new connections ---");
     }
+
+    // clear active in-memory websocket registry
+    connectionRegistry.clear();
+    logger.info("--- WebSocket connection registry cleared ---");
 
     // drain & close BullMQ worker queue
     await closeQueue();
