@@ -19,99 +19,120 @@ import {
 
 const utf8 = new TextDecoder();
 
+/**
+ * Stateful binary reader for parsing frames with automatic bounds checking.
+ * Encapsulates the raw byte buffer, DataView, and cursor offset.
+ */
+export class FrameReader implements DecoderContext {
+  public readonly view: DataView;
+  public o: number = 0;
+
+  constructor(public readonly bytes: Uint8Array) {
+    this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  }
+
+  get offset(): number {
+    return this.o;
+  }
+
+  set offset(value: number) {
+    this.o = value;
+  }
+
+  get remaining(): number {
+    return this.bytes.byteLength - this.o;
+  }
+
+  requireBytes(n: number, errorDetail: string): void {
+    if (this.o + n > this.bytes.byteLength) {
+      throw new ProtocolError(ErrorCode.INVALID_FRAME, errorDetail);
+    }
+  }
+
+  readUint8(errorDetail: string): number {
+    this.requireBytes(1, errorDetail);
+    return this.view.getUint8(this.o++);
+  }
+
+  readUint16(errorDetail: string): number {
+    this.requireBytes(2, errorDetail);
+    const value = this.view.getUint16(this.o, false);
+    this.o += 2;
+    return value;
+  }
+
+  readUint64(errorDetail: string): bigint {
+    this.requireBytes(8, errorDetail);
+    const value = this.view.getBigUint64(this.o, false);
+    this.o += 8;
+    return value;
+  }
+
+  readBytes(length: number, errorDetail: string): Uint8Array {
+    this.requireBytes(length, errorDetail);
+    const slice = this.bytes.subarray(this.o, this.o + length);
+    this.o += length;
+    return slice;
+  }
+
+  readString(lenError: string, dataError: string): string {
+    const length = this.readUint8(lenError);
+    return utf8.decode(this.readBytes(length, dataError));
+  }
+
+  assertFinished(): void {
+    if (this.o !== this.bytes.byteLength) {
+      throw new ProtocolError(ErrorCode.INVALID_FRAME, "TRAILING_GARBAGE");
+    }
+  }
+}
+
 export function decode(bytes: Uint8Array): AnyMessage {
-  // check if the frame contains atleast the magic byte and type
-  if (bytes.byteLength < MIN_FRAME_SIZE)
+  // check if the frame contains at least the magic byte and message type
+  if (bytes.byteLength < MIN_FRAME_SIZE) {
     throw new ProtocolError(ErrorCode.INVALID_FRAME, "FRAME_TOO_SHORT");
+  }
 
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const reader = new FrameReader(bytes);
 
-  let o = 0;
-  const magicByte = view.getUint8(o++);
-
-  // if not our magic byte, drop it immediately, no further processing needed
-  if (magicByte !== PROTOCOL_MAGIC_BYTE)
+  const magicByte = reader.readUint8("FRAME_TOO_SHORT");
+  if (magicByte !== PROTOCOL_MAGIC_BYTE) {
     throw new ProtocolError(ErrorCode.INVALID_FRAME, "BAD_MAGIC");
+  }
 
-  const type = view.getUint8(o++);
-  const ctx: DecoderContext = { bytes, view, o };
+  const type = reader.readUint8("FRAME_TOO_SHORT");
 
-  // route the remaining buffer to the correct sub-decoder
   switch (type) {
     case MessageType.JOIN_ROOM:
-      return decodeJoin(ctx);
+      return decodeJoin(reader);
     case MessageType.LEAVE_ROOM:
-      return decodeLeave(ctx);
+      return decodeLeave(reader);
     case MessageType.CHAT_MESSAGE:
-      return decodeChat(ctx);
+      return decodeChat(reader);
     case MessageType.KEY_EXCHANGE:
-      return decodeKeyExchange(ctx);
+      return decodeKeyExchange(reader);
     case MessageType.DELIVERY_ACK:
-      return decodeAck(ctx);
+      return decodeAck(reader);
     case MessageType.PRESENCE_PING:
-      return decodePing(ctx);
+      return decodePing(reader);
     case MessageType.ROOM_STATE:
-      return decodeRoomState(ctx);
+      return decodeRoomState(reader);
     case MessageType.ERROR:
-      return decodeError(ctx);
+      return decodeError(reader);
     default:
       throw new ProtocolError(ErrorCode.INVALID_FRAME, "UNKNOWN_OPCODE");
   }
 }
 
-// every read below is bounds-checked before it executes
-// ctx.o is the shared cursor, exact fit asserted once per decoder
-function requireBytes(ctx: DecoderContext, n: number, what: string): void {
-  if (ctx.o + n > ctx.bytes.byteLength)
-    throw new ProtocolError(ErrorCode.INVALID_FRAME, what);
-}
-
-function readU8(ctx: DecoderContext, what: string): number {
-  requireBytes(ctx, 1, what);
-  return ctx.view.getUint8(ctx.o++);
-}
-
-function readU16(ctx: DecoderContext, what: string): number {
-  requireBytes(ctx, SIZES.MSG_ID, what);
-  const v = ctx.view.getUint16(ctx.o, false);
-  ctx.o += SIZES.MSG_ID;
-  return v;
-}
-
-function readU64(ctx: DecoderContext, what: string): bigint {
-  requireBytes(ctx, SIZES.TIMESTAMP, what);
-  const v = ctx.view.getBigUint64(ctx.o, false);
-  ctx.o += SIZES.TIMESTAMP;
-  return v;
-}
-
-function readRaw(ctx: DecoderContext, n: number, what: string): Uint8Array {
-  requireBytes(ctx, n, what);
-  const s = ctx.bytes.subarray(ctx.o, ctx.o + n);
-  ctx.o += n;
-  return s;
-}
-
-function readStr(
-  ctx: DecoderContext,
-  lenGate: string,
-  strGate: string
-): string {
-  const len = readU8(ctx, lenGate);
-  return utf8.decode(readRaw(ctx, len, strGate));
-}
-
-function end(ctx: DecoderContext): void {
-  if (ctx.o !== ctx.bytes.byteLength)
-    throw new ProtocolError(ErrorCode.INVALID_FRAME, "TRAILING_GARBAGE");
-}
-
-// sub-decoders, each starts past the 2-byte header
-function decodeJoin(ctx: DecoderContext): JoinRoomMessage {
-  const roomToken = readStr(ctx, "TRUNCATED_ROOM_LEN", "TRUNCATED_ROOM_TOKEN");
-  const publicKey = readRaw(ctx, SIZES.PUBKEY, "TRUNCATED_PUBLIC_KEY");
-  const passwordHash = readRaw(ctx, SIZES.HASH, "TRUNCATED_PASSWORD_HASH");
-  end(ctx);
+// sub-decoders: each reads fields in wire order and asserts exact frame consumption
+function decodeJoin(reader: FrameReader): JoinRoomMessage {
+  const roomToken = reader.readString(
+    "TRUNCATED_ROOM_LEN",
+    "TRUNCATED_ROOM_TOKEN"
+  );
+  const publicKey = reader.readBytes(SIZES.PUBKEY, "TRUNCATED_PUBLIC_KEY");
+  const passwordHash = reader.readBytes(SIZES.HASH, "TRUNCATED_PASSWORD_HASH");
+  reader.assertFinished();
 
   return {
     type: MessageType.JOIN_ROOM,
@@ -121,9 +142,12 @@ function decodeJoin(ctx: DecoderContext): JoinRoomMessage {
   };
 }
 
-function decodeLeave(ctx: DecoderContext): LeaveRoomMessage {
-  const roomToken = readStr(ctx, "TRUNCATED_ROOM_LEN", "TRUNCATED_ROOM_TOKEN");
-  end(ctx);
+function decodeLeave(reader: FrameReader): LeaveRoomMessage {
+  const roomToken = reader.readString(
+    "TRUNCATED_ROOM_LEN",
+    "TRUNCATED_ROOM_TOKEN"
+  );
+  reader.assertFinished();
 
   return {
     type: MessageType.LEAVE_ROOM,
@@ -131,16 +155,19 @@ function decodeLeave(ctx: DecoderContext): LeaveRoomMessage {
   };
 }
 
-function decodeChat(ctx: DecoderContext): ChatMessage {
-  const roomToken = readStr(ctx, "TRUNCATED_ROOM_LEN", "TRUNCATED_ROOM_TOKEN");
-  const from = readStr(ctx, "TRUNCATED_FROM_LEN", "TRUNCATED_FROM");
-  const msgId = readU16(ctx, "TRUNCATED_MSG_ID");
-  const timestamp = readU64(ctx, "TRUNCATED_TIMESTAMP");
-  const iv = readRaw(ctx, SIZES.IV, "TRUNCATED_IV");
-  const ctLen = readU16(ctx, "TRUNCATED_CT_LEN");
-  const cipherText = readRaw(ctx, ctLen, "TRUNCATED_CIPHERTEXT");
-  const burn = readU8(ctx, "TRUNCATED_BURN") !== 0;
-  end(ctx);
+function decodeChat(reader: FrameReader): ChatMessage {
+  const roomToken = reader.readString(
+    "TRUNCATED_ROOM_LEN",
+    "TRUNCATED_ROOM_TOKEN"
+  );
+  const from = reader.readString("TRUNCATED_FROM_LEN", "TRUNCATED_FROM");
+  const msgId = reader.readUint16("TRUNCATED_MSG_ID");
+  const timestamp = reader.readUint64("TRUNCATED_TIMESTAMP");
+  const iv = reader.readBytes(SIZES.IV, "TRUNCATED_IV");
+  const ctLen = reader.readUint16("TRUNCATED_CT_LEN");
+  const cipherText = reader.readBytes(ctLen, "TRUNCATED_CIPHERTEXT");
+  const burn = reader.readUint8("TRUNCATED_BURN") !== 0;
+  reader.assertFinished();
 
   return {
     type: MessageType.CHAT_MESSAGE,
@@ -154,11 +181,14 @@ function decodeChat(ctx: DecoderContext): ChatMessage {
   };
 }
 
-function decodeKeyExchange(ctx: DecoderContext): KeyExchangeMessage {
-  const roomToken = readStr(ctx, "TRUNCATED_ROOM_LEN", "TRUNCATED_ROOM_TOKEN");
-  const from = readStr(ctx, "TRUNCATED_FROM_LEN", "TRUNCATED_FROM");
-  const publicKey = readRaw(ctx, SIZES.PUBKEY, "TRUNCATED_PUBLIC_KEY");
-  end(ctx);
+function decodeKeyExchange(reader: FrameReader): KeyExchangeMessage {
+  const roomToken = reader.readString(
+    "TRUNCATED_ROOM_LEN",
+    "TRUNCATED_ROOM_TOKEN"
+  );
+  const from = reader.readString("TRUNCATED_FROM_LEN", "TRUNCATED_FROM");
+  const publicKey = reader.readBytes(SIZES.PUBKEY, "TRUNCATED_PUBLIC_KEY");
+  reader.assertFinished();
 
   return {
     type: MessageType.KEY_EXCHANGE,
@@ -168,11 +198,14 @@ function decodeKeyExchange(ctx: DecoderContext): KeyExchangeMessage {
   };
 }
 
-function decodeAck(ctx: DecoderContext): DeliveryAckMessage {
-  const roomToken = readStr(ctx, "TRUNCATED_ROOM_LEN", "TRUNCATED_ROOM_TOKEN");
-  const from = readStr(ctx, "TRUNCATED_FROM_LEN", "TRUNCATED_FROM");
-  const msgId = readU16(ctx, "TRUNCATED_MSG_ID");
-  end(ctx);
+function decodeAck(reader: FrameReader): DeliveryAckMessage {
+  const roomToken = reader.readString(
+    "TRUNCATED_ROOM_LEN",
+    "TRUNCATED_ROOM_TOKEN"
+  );
+  const from = reader.readString("TRUNCATED_FROM_LEN", "TRUNCATED_FROM");
+  const msgId = reader.readUint16("TRUNCATED_MSG_ID");
+  reader.assertFinished();
 
   return {
     type: MessageType.DELIVERY_ACK,
@@ -182,10 +215,13 @@ function decodeAck(ctx: DecoderContext): DeliveryAckMessage {
   };
 }
 
-function decodePing(ctx: DecoderContext): PresencePingMessage {
-  const roomToken = readStr(ctx, "TRUNCATED_ROOM_LEN", "TRUNCATED_ROOM_TOKEN");
-  const from = readStr(ctx, "TRUNCATED_FROM_LEN", "TRUNCATED_FROM");
-  end(ctx);
+function decodePing(reader: FrameReader): PresencePingMessage {
+  const roomToken = reader.readString(
+    "TRUNCATED_ROOM_LEN",
+    "TRUNCATED_ROOM_TOKEN"
+  );
+  const from = reader.readString("TRUNCATED_FROM_LEN", "TRUNCATED_FROM");
+  reader.assertFinished();
 
   return {
     type: MessageType.PRESENCE_PING,
@@ -194,13 +230,17 @@ function decodePing(ctx: DecoderContext): PresencePingMessage {
   };
 }
 
-function decodeRoomState(ctx: DecoderContext): RoomStateMessage {
-  const roomToken = readStr(ctx, "TRUNCATED_ROOM_LEN", "TRUNCATED_ROOM_TOKEN");
-  const count = readU8(ctx, "TRUNCATED_MEMBER_CNT");
+function decodeRoomState(reader: FrameReader): RoomStateMessage {
+  const roomToken = reader.readString(
+    "TRUNCATED_ROOM_LEN",
+    "TRUNCATED_ROOM_TOKEN"
+  );
+  const count = reader.readUint8("TRUNCATED_MEMBER_CNT");
   const members: Uint8Array[] = [];
-  for (let i = 0; i < count; i++)
-    members.push(readRaw(ctx, SIZES.PUBKEY, "TRUNCATED_MEMBER_KEY"));
-  end(ctx);
+  for (let i = 0; i < count; i++) {
+    members.push(reader.readBytes(SIZES.PUBKEY, "TRUNCATED_MEMBER_KEY"));
+  }
+  reader.assertFinished();
 
   return {
     type: MessageType.ROOM_STATE,
@@ -209,11 +249,12 @@ function decodeRoomState(ctx: DecoderContext): RoomStateMessage {
   };
 }
 
-function decodeError(ctx: DecoderContext): ErrorMessage {
-  const code = readU8(ctx, "TRUNCATED_ERROR_CODE");
-  if (!isErrorCode(code))
+function decodeError(reader: FrameReader): ErrorMessage {
+  const code = reader.readUint8("TRUNCATED_ERROR_CODE");
+  if (!isErrorCode(code)) {
     throw new ProtocolError(ErrorCode.INVALID_FRAME, "UNKNOWN_ERROR_CODE");
-  end(ctx);
+  }
+  reader.assertFinished();
 
   return {
     type: MessageType.ERROR,
