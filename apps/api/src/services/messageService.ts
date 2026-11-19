@@ -1,4 +1,9 @@
-import type { RoomMessageRow } from "@toku/db";
+import type {
+  MarkDeliveredJob,
+  RoomMessageRow,
+  TrackMessageJob,
+  WorkerJob,
+} from "@toku/db";
 import {
   createOfflineQueueStore,
   createPubSubStore,
@@ -10,25 +15,7 @@ import { db } from "../db";
 import { workerQueue } from "../queue";
 import { redis } from "../redis";
 
-export interface TrackMessageJob {
-  type: "TRACK_MESSAGE";
-  roomToken: string;
-  msgId: number;
-  ciphertextHex: string;
-  ivHex: string;
-  recipientHashes: string[];
-  createdAt: number;
-}
-
-export interface MarkDeliveredJob {
-  type: "MARK_DELIVERED";
-  roomToken: string;
-  msgId: number;
-  recipientHash: string;
-  deliveredAt: number;
-}
-
-export type WorkerJob = TrackMessageJob | MarkDeliveredJob;
+export type { TrackMessageJob, MarkDeliveredJob, WorkerJob };
 
 // initialize the stores
 const pubSubStore = createPubSubStore(redis.pub, redis.sub);

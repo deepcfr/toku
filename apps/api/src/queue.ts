@@ -1,4 +1,5 @@
 import { Queue, type DefaultJobOptions } from "bullmq";
+import { WORKER_QUEUE_NAME } from "@toku/db";
 import { config } from "./config";
 
 /**
@@ -20,7 +21,7 @@ export const DEFAULT_JOB_OPTIONS: DefaultJobOptions = {
   removeOnFail: { count: 1000 },
 };
 
-export const WORKER_QUEUE_NAME = "toku-worker";
+export { WORKER_QUEUE_NAME };
 
 // producer
 export const workerQueue = new Queue(WORKER_QUEUE_NAME, {

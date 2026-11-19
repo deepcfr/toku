@@ -43,6 +43,24 @@
         "pino-pretty": "^13.2.0",
       },
     },
+    "apps/worker": {
+      "name": "@toku/worker",
+      "version": "0.1.0",
+      "dependencies": {
+        "@toku/db": "workspace:*",
+        "@toku/env": "workspace:*",
+        "@toku/redis": "workspace:*",
+        "bullmq": "^6.7.6",
+        "pino": "^10.4.0",
+        "zod": "^4.6.7",
+      },
+      "devDependencies": {
+        "@toku/eslint-config": "workspace:*",
+        "@toku/typescript-config": "workspace:*",
+        "@types/bun": "latest",
+        "pino-pretty": "^13.2.0",
+      },
+    },
     "packages/crypto": {
       "name": "@toku/crypto",
       "version": "0.0.0",
@@ -231,6 +249,8 @@
     "@toku/redis": ["@toku/redis@workspace:packages/redis"],
 
     "@toku/typescript-config": ["@toku/typescript-config@workspace:packages/typescript-config"],
+
+    "@toku/worker": ["@toku/worker@workspace:apps/worker"],
 
     "@turbo/darwin-64": ["@turbo/darwin-64@2.11.2", "", { "os": "darwin", "cpu": "x64" }, "sha512-0pGfE4Lpxrbd+6gUD9z025Tn4z9uMaSNZ3VX0H/hkUPZkjY5xrCa1NfTqocs09NM5NiYE3wEVcoYBadrhayRCA=="],
 

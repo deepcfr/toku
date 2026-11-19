@@ -49,3 +49,31 @@ export interface ActiveBanRow {
   banned_at: Date;
   expires_at: Date;
 }
+
+// Background queue contract shared between API producer and worker consumer
+export const WORKER_QUEUE_NAME = "toku-worker";
+
+export interface TrackMessageJob {
+  type: "TRACK_MESSAGE";
+  roomToken: string;
+  msgId: number;
+  ciphertextHex: string;
+  ivHex: string;
+  recipientHashes: string[];
+  createdAt: number;
+}
+
+export interface MarkDeliveredJob {
+  type: "MARK_DELIVERED";
+  roomToken: string;
+  msgId: number;
+  recipientHash: string;
+  deliveredAt: number;
+}
+
+export interface CleanupJob {
+  type: "CLEANUP_EXPIRED";
+  timestamp?: number;
+}
+
+export type WorkerJob = TrackMessageJob | MarkDeliveredJob | CleanupJob;

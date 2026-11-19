@@ -7,7 +7,7 @@ export const workerEnv = createEnv({
   server: {
     NODE_ENV: nodeEnvSchema,
     REDIS_URL: redisUrlSchema,
-    DATABASE_URL: databaseUrlSchema.optional(),
+    DATABASE_URL: databaseUrlSchema,
     WORKER_CONCURRENCY: z.coerce.number().int().positive().default(10),
   },
   runtimeEnv: {
